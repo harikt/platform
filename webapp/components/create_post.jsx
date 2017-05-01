@@ -72,7 +72,7 @@ export default class CreatePost extends React.Component {
         PostStore.clearDraftUploads();
 
         const channelId = ChannelStore.getCurrentId();
-        const draft = PostStore.getPostDraft(channelId);
+        const draft = PostStore.getDraft(channelId);
 
         this.state = {
             channelId,
@@ -137,7 +137,7 @@ export default class CreatePost extends React.Component {
 
         const isReaction = REACTION_PATTERN.exec(post.message);
         if (post.message.indexOf('/') === 0) {
-            PostActions.storePostDraft(this.state.channelId, null);
+            PostStore.storeDraft(this.state.channelId, null);
             this.setState({message: '', postError: null, fileInfos: [], enableSendButton: false});
 
             const args = {};
@@ -195,7 +195,6 @@ export default class CreatePost extends React.Component {
 
     sendMessage(post) {
         post.channel_id = this.state.channelId;
-        post.file_ids = this.state.fileInfos.map((info) => info.id);
 
         const time = Utils.getTimestamp();
         const userId = UserStore.getCurrentId();
@@ -214,7 +213,7 @@ export default class CreatePost extends React.Component {
             });
         }
 
-        PostActions.queuePost(post, false, null,
+        PostActions.createPost(post, this.state.fileInfos, null,
             (err) => {
                 if (err.id === 'api.post.create_post.root_id.app_error') {
                     // this should never actually happen since you can't reply from this textbox
@@ -234,7 +233,7 @@ export default class CreatePost extends React.Component {
         const action = isReaction[1];
 
         const emojiName = isReaction[2];
-        const postId = PostStore.getLatestPost(this.state.channelId).id;
+        const postId = PostStore.getLatestPostId(this.state.channelId);
 
         if (action === '+') {
             PostActions.addReaction(this.state.channelId, postId, emojiName);
@@ -242,7 +241,7 @@ export default class CreatePost extends React.Component {
             PostActions.removeReaction(this.state.channelId, postId, emojiName);
         }
 
-        PostActions.storePostDraft(this.state.channelId, null);
+        PostStore.storeDraft(this.state.channelId, null);
     }
 
     focusTextbox(keepFocus = false) {
@@ -272,9 +271,9 @@ export default class CreatePost extends React.Component {
             enableSendButton
         });
 
-        const draft = PostStore.getPostDraft(this.state.channelId);
+        const draft = PostStore.getDraft(this.state.channelId);
         draft.message = message;
-        PostActions.storePostDraft(this.state.channelId, draft);
+        PostStore.storeDraft(this.state.channelId, draft);
     }
 
     handleFileUploadChange() {
@@ -282,10 +281,10 @@ export default class CreatePost extends React.Component {
     }
 
     handleUploadStart(clientIds, channelId) {
-        const draft = PostStore.getPostDraft(channelId);
+        const draft = PostStore.getDraft(channelId);
 
         draft.uploadsInProgress = draft.uploadsInProgress.concat(clientIds);
-        PostActions.storePostDraft(channelId, draft);
+        PostStore.storeDraft(channelId, draft);
 
         this.setState({uploadsInProgress: draft.uploadsInProgress});
 
@@ -295,7 +294,7 @@ export default class CreatePost extends React.Component {
     }
 
     handleFileUploadComplete(fileInfos, clientIds, channelId) {
-        const draft = PostStore.getPostDraft(channelId);
+        const draft = PostStore.getDraft(channelId);
 
         // remove each finished file from uploads
         for (let i = 0; i < clientIds.length; i++) {
@@ -307,7 +306,7 @@ export default class CreatePost extends React.Component {
         }
 
         draft.fileInfos = draft.fileInfos.concat(fileInfos);
-        PostActions.storePostDraft(channelId, draft);
+        PostStore.storeDraft(channelId, draft);
 
         if (channelId === this.state.channelId) {
             this.setState({
@@ -326,14 +325,14 @@ export default class CreatePost extends React.Component {
         }
 
         if (clientId !== -1) {
-            const draft = PostStore.getPostDraft(channelId);
+            const draft = PostStore.getDraft(channelId);
 
             const index = draft.uploadsInProgress.indexOf(clientId);
             if (index !== -1) {
                 draft.uploadsInProgress.splice(index, 1);
             }
 
-            PostActions.storePostDraft(channelId, draft);
+            PostStore.storeDraft(channelId, draft);
 
             if (channelId === this.state.channelId) {
                 this.setState({uploadsInProgress: draft.uploadsInProgress});
@@ -363,10 +362,10 @@ export default class CreatePost extends React.Component {
             fileInfos.splice(index, 1);
         }
 
-        const draft = PostStore.getPostDraft(this.state.channelId);
+        const draft = PostStore.getDraft(this.state.channelId);
         draft.fileInfos = fileInfos;
         draft.uploadsInProgress = uploadsInProgress;
-        PostActions.storePostDraft(this.state.channelId, draft);
+        PostStore.storeDraft(this.state.channelId, draft);
         const enableSendButton = this.handleEnableSendButton(this.state.message, fileInfos);
 
         this.setState({fileInfos, uploadsInProgress, enableSendButton});
@@ -433,7 +432,7 @@ export default class CreatePost extends React.Component {
     onChange() {
         const channelId = ChannelStore.getCurrentId();
         if (this.state.channelId !== channelId) {
-            const draft = PostStore.getPostDraft(channelId);
+            const draft = PostStore.getDraft(channelId);
 
             this.setState({channelId, message: draft.message, submitting: false, serverError: null, postError: null, fileInfos: draft.fileInfos, uploadsInProgress: draft.uploadsInProgress});
         }
@@ -454,7 +453,7 @@ export default class CreatePost extends React.Component {
             return this.state.fileInfos.length + this.state.uploadsInProgress.length;
         }
 
-        const draft = PostStore.getPostDraft(channelId);
+        const draft = PostStore.getDraft(channelId);
         return draft.fileInfos.length + draft.uploadsInProgress.length;
     }
 
